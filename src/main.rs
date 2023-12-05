@@ -1,5 +1,17 @@
-use regex::{Captures, Regex};
+use fancy_regex::{Captures, Regex};
 use std::fs;
+
+const NUMBERS: [(&'static str, i32); 9] = [
+    ("one", 1),
+    ("two", 2),
+    ("three", 3),
+    ("four", 4),
+    ("five", 5),
+    ("six", 6),
+    ("seven", 7),
+    ("eight", 8),
+    ("nine", 9),
+];
 
 fn main() {
     let content = fs::read_to_string("./input.txt").expect("File should exist");
@@ -10,22 +22,43 @@ fn main() {
         .map(extract_calibration_value)
         .sum();
 
-    println!("Sum of all the calibration values: {result}");
+    println!("Sum of all the calibration values: {:?}", result);
 }
 
 fn extract_calibration_value(input_code: &&str) -> i32 {
-    let digit_regex = Regex::new(r"(?<digits>\d)").unwrap();
-    let digits = digit_regex
-        .captures_iter(input_code)
-        .map(digits_from_capture)
-        .collect::<Vec<i32>>();
+    let digit_regex = Regex::new(r"(?=(\d|one|two|three|four|five|six|seven|eight|nine))").unwrap();
+    let mut capture_iterator = digit_regex.captures_iter(input_code);
+    let first = get_number(capture_iterator.next());
+    let last = get_number(capture_iterator.last());
 
-    (digits[0] * 10) + digits[digits.len() - 1]
+    match first {
+        Some(first) => match last {
+            Some(last) => (first * 10) + last,
+            None => first * 11,
+        },
+        None => panic!("No digit found"),
+    }
 }
 
-fn digits_from_capture(value: Captures<'_>) -> i32 {
-    match value.name("digits").unwrap().as_str().parse() {
-        Ok(number) => number,
-        Err(err) => panic!("Input must be a number {}", err),
+fn get_number(value: Option<Result<Captures<'_>, fancy_regex::Error>>) -> Option<i32> {
+    match value {
+        Some(value) => match value {
+            Ok(value) => match value.get(1) {
+                Some(value) => match value.as_str().parse() {
+                    Ok(number) => Some(number),
+                    Err(_) => match NUMBERS
+                        .iter()
+                        .filter(|number| number.0 == value.as_str())
+                        .next()
+                    {
+                        Some(number) => Some(number.1),
+                        None => None,
+                    },
+                },
+                None => None,
+            },
+            Err(_) => None,
+        },
+        None => None,
     }
 }
